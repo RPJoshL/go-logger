@@ -14,7 +14,7 @@ type colorConfig struct {
 // Default ANSI color code definitions.
 // The variable contains a function that will be padded by the
 // matching color. You can also specify replace values after the string
-// for printf.
+// using printf.
 var (
 	colPurple      = color("\033[1;35m%s\033[0m")
 	colPurpleLight = color("\033[0;35m%s\033[0m")

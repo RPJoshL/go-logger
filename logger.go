@@ -219,6 +219,8 @@ func GetGlobalLogger() *Logger {
 	return &dLogger
 }
 
+// Global available methods per logging levels //
+
 func Trace(message string, parameters ...any) {
 	dLogger.Log(LevelTrace, message, parameters...)
 }
@@ -236,6 +238,27 @@ func Error(message string, parameters ...any) {
 }
 func Fatal(message string, parameters ...any) {
 	dLogger.Log(LevelFatal, message, parameters...)
+}
+
+// Available methods for each logger per logging level //
+
+func (l Logger) Trace(message string, parameters ...any) {
+	l.Log(LevelTrace, message, parameters...)
+}
+func (l Logger) Debug(message string, parameters ...any) {
+	l.Log(LevelDebug, message, parameters...)
+}
+func (l Logger) Info(message string, parameters ...any) {
+	l.Log(LevelInfo, message, parameters...)
+}
+func (l Logger) Warning(message string, parameters ...any) {
+	l.Log(LevelWarning, message, parameters...)
+}
+func (l Logger) Error(message string, parameters ...any) {
+	l.Log(LevelError, message, parameters...)
+}
+func (l Logger) Fatal(message string, parameters ...any) {
+	l.Log(LevelFatal, message, parameters...)
 }
 
 // CloseFile closes the underlaying file to which the logger messages are written.

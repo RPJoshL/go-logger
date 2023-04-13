@@ -31,7 +31,7 @@ type Logger struct {
 	PrintSource bool
 
 	// Colorizes the log messages for the console.
-	// Even if you set this to true, the user is able to overwrite this behaviour by
+	// Even if you set this to true the user is able to overwrite this behaviour by
 	// setting the environment variables "TERMINAL_DISABLE_COLORS" and
 	// "TERMINAL_ENABLE_COLORS" (to force coloring for "unsupported" terminals)
 	ColoredOutput bool

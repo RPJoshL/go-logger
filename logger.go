@@ -12,18 +12,6 @@ import (
 	"time"
 )
 
-// Level of the log message
-type Level uint8
-
-const (
-	LevelTrace Level = iota
-	LevelDebug
-	LevelInfo
-	LevelWarning
-	LevelError
-	LevelFatal
-)
-
 type Logger struct {
 	PrintLevel  Level
 	LogLevel    Level
@@ -39,7 +27,7 @@ type Logger struct {
 	// While logging, the file and line number of the
 	// invoking (calling) line can be printed out.
 	// This defines an offset that is applied to the call stack.
-	// If you you are using an own wrapper function, you
+	// If you are using an own wrapper function, you
 	// have to set this value to one
 	FuncCallIncrement int
 
@@ -101,27 +89,7 @@ func (l *Logger) log(level Level, message string, parameters ...any) {
 	}
 
 	// Get the name of the level to log
-	var levelName string
-	switch level {
-	case LevelTrace:
-		levelName = "TRACE"
-	case LevelDebug:
-		levelName = "DEBUG"
-	case LevelInfo:
-		levelName = "INFO "
-	case LevelWarning:
-		levelName = "WARN "
-	case LevelError:
-		levelName = "ERROR"
-	case LevelFatal:
-		levelName = "FATAL"
-	}
-
-	if levelName == "" {
-		message = fmt.Sprintf("Invalid level value given: %d. Original message: ", level) + message
-		levelName = "WARN "
-		level = LevelWarning
-	}
+	var levelName = fmt.Sprintf("%-5s", level)
 
 	printMessage := "[" + levelName + "] " + time.Now().Local().Format("2006-01-02 15:04:05") +
 		getSourceMessage(file, line, pc, *l) + " - " + fmt.Sprintf(message, parameters...)
@@ -266,29 +234,27 @@ func CloseFile() {
 	dLogger.CloseFile()
 }
 
-// GetLevelByName tries to convert the given level name to the represented level code.
-// Allowed values are: 'trace', 'debug', 'info', 'warn', 'warning', 'error', 'panic' and 'fatal'
-// If an incorrect level name was given an warning is logged and info will be returned
-func GetLevelByName(levelName string) Level {
-	levelName = strings.ToLower(levelName)
-	switch levelName {
-	case "trace":
-		return LevelTrace
-	case "debug":
-		return LevelDebug
-	case "info":
-		return LevelInfo
-	case "warn", "warning":
-		return LevelWarning
-	case "error":
-		return LevelError
-	case "panic", "fatal":
-		return LevelFatal
-
-	default:
-		{
-			Warning("Unable to parse the level name '%s'. Expected 'debug', 'info', 'warn', 'error' or 'fatal'", levelName)
-			return LevelInfo
-		}
-	}
+// GetLoggerFromEnv returns a logging instance configured
+// from the available environment variables.
+//
+// The environment variables have to be named like the struct
+// fields in upper case with the prefix "LOGGER_".
+// Sub structs are divided also by an underscore. Example:
+// "LOGGER_SUBCONFIG_DISABLED"
+//
+// If no env variable was found the default value of the given
+// logger struct will be used.
+//
+// Note that only generic options can be set like:
+// - Print and Log Level
+// - Log path
+// - ColoredOutput
+// - Tracing disabled
+func GetLoggerFromEnv(defaultLogger *Logger) *Logger {
+	defaultLogger.ColoredOutput = getEnvBool("LOGGER_COLOREDOUTPUT", defaultLogger.ColoredOutput)
+	defaultLogger.PrintLevel = GetLevelByName(getEnvString("LOGGER_PRINTLEVEL", defaultLogger.PrintLevel.String()))
+	defaultLogger.LogLevel = GetLevelByName(getEnvString("LOGGER_LOGLEVEL", defaultLogger.LogLevel.String()))
+	defaultLogger.LogFilePath = getEnvString("LOGGER_LOGFILEPATH", defaultLogger.LogFilePath)
+	defaultLogger.PrintSource = getEnvBool("LOGGER_PRINTSOURCE", defaultLogger.PrintSource)
+	return NewLogger(defaultLogger)
 }

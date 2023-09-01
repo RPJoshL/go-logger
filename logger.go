@@ -13,16 +13,18 @@ import (
 )
 
 type Logger struct {
-	PrintLevel  Level
-	LogLevel    Level
-	LogFilePath string
-	PrintSource bool
+
+	// Minimum log level for printing to the console (stdout and stderr)
+	Level Level
 
 	// Colorizes the log messages for the console.
 	// Even if you set this to true the user is able to overwrite this behaviour by
 	// setting the environment variables "TERMINAL_DISABLE_COLORS" and
 	// "TERMINAL_ENABLE_COLORS" (to force coloring for "unsupported" terminals)
 	ColoredOutput bool
+
+	// Whether to print the file and line number of the invoking (calling line)
+	PrintSource bool
 
 	// While logging, the file and line number of the
 	// invoking (calling) line can be printed out.
@@ -31,11 +33,12 @@ type Logger struct {
 	// have to set this value to one
 	FuncCallIncrement int
 
+	// Configuration options for logging into a file
+	File *FileLogger
+
 	colorConf        colorConfig
 	consoleLogger    *log.Logger
 	consoleLoggerErr *log.Logger
-	fileLogger       *log.Logger
-	logFile          *os.File
 }
 
 // Globally available logging instance. This will be uesed if log functions
@@ -44,9 +47,11 @@ var dLogger Logger
 
 func init() {
 	dLogger = Logger{
-		PrintLevel:  LevelDebug,
-		LogLevel:    LevelInfo,
-		LogFilePath: "",
+		Level: LevelDebug,
+		File: &FileLogger{
+			Level: LevelInfo,
+			Path:  "",
+		},
 		PrintSource: false,
 	}
 
@@ -64,11 +69,11 @@ func NewLogger(logger *Logger) *Logger {
 // configuration.
 // Instead of opening a new file to write the log messages to,
 // the old file reference of the other logger will be used internal.
-// This enables you to writhe to the same file with different log configurations.
+// This enables you to write to the same file with different log configurations.
 func NewLoggerWithFile(logger *Logger, file *Logger) *Logger {
-	logger.logFile = file.logFile
-	logger.LogFilePath = file.LogFilePath
-	logger.fileLogger = file.fileLogger
+	logger.File.file = file.File.file
+	logger.File.Path = file.File.Path
+	logger.File.logger = file.File.logger
 
 	logger.setup(true)
 	return logger
@@ -92,24 +97,19 @@ func (l *Logger) log(level Level, message string, parameters ...any) {
 	var levelName = fmt.Sprintf("%-5s", level)
 
 	printMessage := "[" + levelName + "] " + time.Now().Local().Format("2006-01-02 15:04:05") +
-		getSourceMessage(file, line, pc, *l) + " - " + fmt.Sprintf(message, parameters...)
+		getSourceMessage(file, line, pc, l) + " - " + fmt.Sprintf(message, parameters...)
 
 	printMessageColored :=
 		l.getColored("["+levelName+"] ", level.getColor()) +
 			l.getColored(time.Now().Local().Format("2006-01-02 15:04:05"), colCyan) +
-			l.getColored(getSourceMessage(file, line, pc, *l), colPurple) + " - " +
+			l.getColored(getSourceMessage(file, line, pc, l), colPurple) + " - " +
 			l.getColored(fmt.Sprintf(message, parameters...), level.getColor())
 
-	if l.LogLevel <= level && l.fileLogger != nil {
-		l.fileLogger.Println(printMessage)
-		l.logFile.Sync()
-
-		if level == LevelFatal {
-			l.CloseFile()
-		}
+	if l.File.Level <= level && l.File.logger != nil {
+		l.File.writeToFile(printMessage, level)
 	}
 
-	if l.PrintLevel <= level {
+	if l.Level <= level {
 		if level == LevelError {
 			l.consoleLoggerErr.Println(printMessageColored)
 		} else if level == LevelFatal {
@@ -129,7 +129,7 @@ func (l *Logger) getColored(message string, color func(str string, parameters ..
 	return message
 }
 
-func getSourceMessage(file string, line int, pc uintptr, l Logger) string {
+func getSourceMessage(file string, line int, pc uintptr, l *Logger) string {
 	if !l.PrintSource {
 		return ""
 	}
@@ -144,20 +144,10 @@ func (l *Logger) setup(keepFile bool) {
 	l.consoleLogger = log.New(os.Stdout, "", 0)
 	l.consoleLoggerErr = log.New(os.Stderr, "", 0)
 
-	if strings.TrimSpace(l.LogFilePath) != "" && !keepFile {
-		file, err := os.OpenFile(l.LogFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err == nil {
-			l.fileLogger = log.New(file, "", 0)
-			l.logFile = file
-		} else {
-			l.Log(LevelError, fmt.Sprintf("Cannot access the log file '%s'\n%s", l.LogFilePath, err.Error()))
-		}
+	if strings.TrimSpace(l.File.Path) != "" && !keepFile {
+		l.File.openFile()
 	} else if !keepFile {
-		l.fileLogger = nil
-		if l.logFile != nil {
-			l.logFile.Close()
-			l.logFile = nil
-		}
+		l.File.CloseFile()
 	}
 
 	// Functions that could produce a panic
@@ -169,18 +159,10 @@ func (l *Logger) setup(keepFile bool) {
 	l.colorConf = *newColorConfig(l.ColoredOutput)
 }
 
-func (l *Logger) CloseFile() {
-	if l.logFile != nil {
-		l.logFile.Close()
-		l.logFile = nil
-		l.fileLogger = nil
-	}
-}
-
 // SetGlobalLogger updates the global default logger with a custom one.
 // You can create one via the Logger struct.
 func SetGlobalLogger(l *Logger) {
-	dLogger = *l
+	dLogger = *l // nolint: golint
 	dLogger.setup(false)
 }
 func GetGlobalLogger() *Logger {
@@ -210,28 +192,28 @@ func Fatal(message string, parameters ...any) {
 
 // Available methods for each logger per logging level //
 
-func (l Logger) Trace(message string, parameters ...any) {
+func (l *Logger) Trace(message string, parameters ...any) {
 	l.Log(LevelTrace, message, parameters...)
 }
-func (l Logger) Debug(message string, parameters ...any) {
+func (l *Logger) Debug(message string, parameters ...any) {
 	l.Log(LevelDebug, message, parameters...)
 }
-func (l Logger) Info(message string, parameters ...any) {
+func (l *Logger) Info(message string, parameters ...any) {
 	l.Log(LevelInfo, message, parameters...)
 }
-func (l Logger) Warning(message string, parameters ...any) {
+func (l *Logger) Warning(message string, parameters ...any) {
 	l.Log(LevelWarning, message, parameters...)
 }
-func (l Logger) Error(message string, parameters ...any) {
+func (l *Logger) Error(message string, parameters ...any) {
 	l.Log(LevelError, message, parameters...)
 }
-func (l Logger) Fatal(message string, parameters ...any) {
+func (l *Logger) Fatal(message string, parameters ...any) {
 	l.Log(LevelFatal, message, parameters...)
 }
 
 // CloseFile closes the underlaying file to which the logger messages are written.
 func CloseFile() {
-	dLogger.CloseFile()
+	dLogger.File.CloseFile()
 }
 
 // GetLoggerFromEnv returns a logging instance configured
@@ -252,9 +234,10 @@ func CloseFile() {
 // - Tracing disabled
 func GetLoggerFromEnv(defaultLogger *Logger) *Logger {
 	defaultLogger.ColoredOutput = getEnvBool("LOGGER_COLOREDOUTPUT", defaultLogger.ColoredOutput)
-	defaultLogger.PrintLevel = GetLevelByName(getEnvString("LOGGER_PRINTLEVEL", defaultLogger.PrintLevel.String()))
-	defaultLogger.LogLevel = GetLevelByName(getEnvString("LOGGER_LOGLEVEL", defaultLogger.LogLevel.String()))
-	defaultLogger.LogFilePath = getEnvString("LOGGER_LOGFILEPATH", defaultLogger.LogFilePath)
+	defaultLogger.Level = GetLevelByName(getEnvString("LOGGER_LEVEL", defaultLogger.Level.String()))
+	defaultLogger.File.Level = GetLevelByName(getEnvString("LOGGER_FILE_LEVEL", defaultLogger.File.Level.String()))
+	defaultLogger.File.Path = getEnvString("LOGGER_FILE_PATH", defaultLogger.File.Path)
+	defaultLogger.File.AppendDate = getEnvBool("LOGGER_FILE_APPENDDATE", defaultLogger.File.AppendDate)
 	defaultLogger.PrintSource = getEnvBool("LOGGER_PRINTSOURCE", defaultLogger.PrintSource)
 	return NewLogger(defaultLogger)
 }

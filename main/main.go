@@ -12,9 +12,12 @@ func main() {
 	l := &logger.Logger{
 		ColoredOutput: true,
 		PrintSource:   true,
-		LogFilePath:   "./logs",
-		PrintLevel:    logger.LevelTrace,
-		LogLevel:      logger.LevelWarning,
+		Level:         logger.LevelTrace,
+		File: &logger.FileLogger{
+			Level:      logger.LevelWarning,
+			Path:       "./logs",
+			AppendDate: true,
+		},
 	}
 	logger.SetGlobalLogger(l)
 
@@ -29,8 +32,10 @@ func main() {
 	lOther := &logger.Logger{
 		ColoredOutput: false,
 		PrintSource:   false,
-		PrintLevel:    logger.LevelDebug,
-		LogLevel:      logger.LevelDebug,
+		Level:         logger.LevelDebug,
+		File: &logger.FileLogger{
+			Level: logger.LevelDebug,
+		},
 	}
 	logger.NewLoggerWithFile(lOther, logger.GetGlobalLogger())
 

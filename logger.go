@@ -26,6 +26,10 @@ type Logger struct {
 	// Whether to print the file and line number of the invoking (calling line)
 	PrintSource bool
 
+	// Only print the log message without any additional info. This property will ignore other options linke
+	// PrintSource or FuncCallIncrement
+	OnlyPrintMessage bool
+
 	// While logging, the file and line number of the
 	// invoking (calling) line can be printed out.
 	// This defines an offset that is applied to the call stack.
@@ -96,14 +100,22 @@ func (l *Logger) log(level Level, message string, parameters ...any) {
 	// Get the name of the level to log
 	var levelName = fmt.Sprintf("%-5s", level)
 
-	printMessage := "[" + levelName + "] " + time.Now().Local().Format("2006-01-02 15:04:05") +
-		getSourceMessage(file, line, pc, l) + " - " + fmt.Sprintf(message, parameters...)
+	// Build the message to print
+	printMessage := fmt.Sprintf(message, parameters...)
+	if !l.OnlyPrintMessage {
+		printMessage = "[" + levelName + "] " + time.Now().Local().Format("2006-01-02 15:04:05") +
+			getSourceMessage(file, line, pc, l) + " - " + printMessage
+	}
 
-	printMessageColored :=
-		l.getColored("["+levelName+"] ", level.getColor()) +
-			l.getColored(time.Now().Local().Format("2006-01-02 15:04:05"), colCyan) +
-			l.getColored(getSourceMessage(file, line, pc, l), colPurple) + " - " +
-			l.getColored(fmt.Sprintf(message, parameters...), level.getColor())
+	// Build the colored message to print
+	printMessageColored := l.getColored(fmt.Sprintf(message, parameters...), level.getColor())
+	if !l.OnlyPrintMessage {
+		printMessageColored =
+			l.getColored("["+levelName+"] ", level.getColor()) +
+				l.getColored(time.Now().Local().Format("2006-01-02 15:04:05"), colCyan) +
+				l.getColored(getSourceMessage(file, line, pc, l), colPurple) + " - " +
+				printMessageColored
+	}
 
 	if l.File.Level <= level && l.File.logger != nil {
 		l.File.writeToFile(printMessage, level)
@@ -235,6 +247,7 @@ func CloseFile() {
 func GetLoggerFromEnv(defaultLogger *Logger) *Logger {
 	defaultLogger.ColoredOutput = getEnvBool("LOGGER_COLOREDOUTPUT", defaultLogger.ColoredOutput)
 	defaultLogger.Level = GetLevelByName(getEnvString("LOGGER_LEVEL", defaultLogger.Level.String()))
+	defaultLogger.OnlyPrintMessage = getEnvBool("LOGGER_ONLYPRINTMESSAGE", defaultLogger.OnlyPrintMessage)
 	defaultLogger.File.Level = GetLevelByName(getEnvString("LOGGER_FILE_LEVEL", defaultLogger.File.Level.String()))
 	defaultLogger.File.Path = getEnvString("LOGGER_FILE_PATH", defaultLogger.File.Path)
 	defaultLogger.File.AppendDate = getEnvBool("LOGGER_FILE_APPENDDATE", defaultLogger.File.AppendDate)

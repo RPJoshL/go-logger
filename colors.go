@@ -21,6 +21,7 @@ var (
 	colRed         = color("\033[1;31m%s\033[0m")
 	colYellow      = color("\033[1;33m%s\033[0m")
 	colBlue        = color("\033[1;34m%s\033[0m")
+	colBlueLight   = color("\033[0;34m%s\033[0m")
 	colCyan        = color("\033[1;36m%s\033[0m")
 	colGreen       = color("\033[0;32m%s\033[0m")
 )

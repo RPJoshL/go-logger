@@ -23,10 +23,10 @@ type FileLogger struct {
 	// so that an own log file for each day is used. The format of the date is 'YYYYMMDD'
 	AppendDate bool
 
-	// Internal dependency used to synchronize the access the log file
-	fileSync sync.RWMutex
+	// Internal dependency used to synchronize the access to the log file
+	fileSync *sync.RWMutex
 	// Additional file sync that is used during writing to the log file
-	fileSyncWrite sync.RWMutex
+	fileSyncWrite *sync.RWMutex
 
 	logger *log.Logger
 	file   *os.File
@@ -38,20 +38,24 @@ type FileLogger struct {
 // CloseFile closes the file that is currently used for logging messages to
 // a file
 func (l *FileLogger) CloseFile() {
-	l.fileSync.Lock()
-
 	if l.file != nil {
+		l.fileSync.Lock()
 		l.file.Close()
 		l.file = nil
 		l.logger = nil
+		l.fileSync.Unlock()
 	}
-
-	l.fileSync.Unlock()
 }
 
 // openFile tries to open the file that is configured inside the loggers fild
-// "LogFilePath"
+// "LogFilePath" and initializes the mutex
 func (l *FileLogger) openFile() {
+	// Initialize new mutex
+	if l.fileSync == nil {
+		l.fileSync = &sync.RWMutex{}
+		l.fileSyncWrite = &sync.RWMutex{}
+	}
+
 	l.fileSync.Lock()
 
 	path := l.getFilePath()

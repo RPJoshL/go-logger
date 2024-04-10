@@ -18,6 +18,7 @@ func main() {
 			Path:       "./logs",
 			AppendDate: true,
 		},
+		Prefix: " PREFIX",
 	}
 	logger.SetGlobalLogger(l)
 
@@ -42,6 +43,12 @@ func main() {
 	lOther.Log(logger.LevelDebug, "Greetings from your brother")
 	logger.Info("It's a Me, Mario")
 	lOther.Log(logger.LevelError, "And im your brother luigi")
+
+	// Create a copy of the logger
+	lOtherCloned := logger.CloneLogger(lOther)
+	lOtherCloned.Level = logger.LevelError
+	lOtherCloned.File.Level = logger.LevelError
+	lOtherCloned.Error("%s != %s", lOther.File.Level, lOtherCloned.File.Level)
 
 	logger.Fatal("Bowser enters the room...")
 }

@@ -37,6 +37,11 @@ type Logger struct {
 	// have to set this value to one
 	FuncCallIncrement int
 
+	// Prefix is applied as a prefix for all log messages.
+	// It's positioned after all other information:
+	//  [INFO ] 2024-04-10 19:00:00 (file:1)PREFIX - Message
+	Prefix string
+
 	// Configuration options for logging into a file
 	File *FileLogger
 
@@ -78,9 +83,28 @@ func NewLoggerWithFile(logger *Logger, file *Logger) *Logger {
 	logger.File.file = file.File.file
 	logger.File.Path = file.File.Path
 	logger.File.logger = file.File.logger
+	logger.File.fileSync = file.File.fileSync
+	logger.File.fileSyncWrite = file.File.fileSyncWrite
 
 	logger.setup(true)
 	return logger
+}
+
+// CloneLogger creates a copy of the provided logger with it's
+// file reference.
+// All configuration options are cloned from "logger" to the new one
+func CloneLogger(logger *Logger) *Logger {
+	// Copy by dereference the pointer
+	copyIn := *logger
+	copy := &copyIn
+	fileIn := *copy.File
+	file := &fileIn
+
+	copy.File = file
+	copy.consoleLogger = nil
+	copy.consoleLoggerErr = nil
+
+	return NewLoggerWithFile(copy, logger)
 }
 
 // Log logs a message with the given level. As additional parameters you can specify
@@ -104,7 +128,7 @@ func (l *Logger) log(level Level, message string, parameters ...any) {
 	printMessage := fmt.Sprintf(message, parameters...)
 	if !l.OnlyPrintMessage {
 		printMessage = "[" + levelName + "] " + time.Now().Local().Format("2006-01-02 15:04:05") +
-			getSourceMessage(file, line, pc, l) + " - " + printMessage
+			getSourceMessage(file, line, pc, l) + l.Prefix + " - " + printMessage
 	}
 
 	// Build the colored message to print
@@ -113,8 +137,9 @@ func (l *Logger) log(level Level, message string, parameters ...any) {
 		printMessageColored =
 			l.getColored("["+levelName+"] ", level.getColor()) +
 				l.getColored(time.Now().Local().Format("2006-01-02 15:04:05"), colCyan) +
-				l.getColored(getSourceMessage(file, line, pc, l), colPurple) + " - " +
-				printMessageColored
+				l.getColored(getSourceMessage(file, line, pc, l), colPurple) +
+				l.getColored(l.Prefix, colBlueLight) +
+				" - " + printMessageColored
 	}
 
 	if l.File.Level <= level && l.File.logger != nil {
@@ -141,7 +166,7 @@ func (l *Logger) getColored(message string, color func(str string, parameters ..
 	return message
 }
 
-func getSourceMessage(file string, line int, pc uintptr, l *Logger) string {
+func getSourceMessage(file string, line int, _ uintptr, l *Logger) string {
 	if !l.PrintSource {
 		return ""
 	}
@@ -151,7 +176,14 @@ func getSourceMessage(file string, line int, pc uintptr, l *Logger) string {
 	return " (" + fileName + ")"
 }
 
+// setup setups the provided logger.
+// This function has to be called before you can use the logger
+// struct!
 func (l *Logger) setup(keepFile bool) {
+
+	// Setup reference for file logger
+	l.File.rootLogger = l
+
 	// log.Ldate|log.Ltime|log.Lshortfile
 	l.consoleLogger = log.New(os.Stdout, "", 0)
 	l.consoleLoggerErr = log.New(os.Stderr, "", 0)
@@ -202,7 +234,7 @@ func Fatal(message string, parameters ...any) {
 	dLogger.Log(LevelFatal, message, parameters...)
 }
 
-// Available methods for each logger per logging level //
+// Available methods for each logger per logging level
 
 func (l *Logger) Trace(message string, parameters ...any) {
 	l.Log(LevelTrace, message, parameters...)

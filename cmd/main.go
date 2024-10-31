@@ -42,7 +42,7 @@ func main() {
 
 	lOther.Log(logger.LevelDebug, "Greetings from your brother")
 	logger.Info("It's a Me, Mario")
-	lOther.Log(logger.LevelError, "And im your brother luigi")
+	lOther.Log(logger.LevelError, "And im your brother %s", "luigi")
 
 	// Create a copy of the logger
 	lOtherCloned := logger.CloneLogger(lOther)

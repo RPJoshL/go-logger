@@ -125,14 +125,17 @@ func (l *Logger) log(level Level, message string, parameters ...any) {
 	var levelName = fmt.Sprintf("%-5s", level)
 
 	// Build the message to print
-	printMessage := fmt.Sprintf(message, parameters...)
+	printMessage := message
+	if len(parameters) > 0 {
+		printMessage = fmt.Sprintf(message, parameters...)
+	}
 	if !l.OnlyPrintMessage {
 		printMessage = "[" + levelName + "] " + time.Now().Local().Format("2006-01-02 15:04:05") +
 			getSourceMessage(file, line, pc, l) + l.Prefix + " - " + printMessage
 	}
 
 	// Build the colored message to print
-	printMessageColored := l.getColored(fmt.Sprintf(message, parameters...), level.getColor())
+	printMessageColored := l.getColored(printMessage, level.getColor())
 	if !l.OnlyPrintMessage {
 		printMessageColored =
 			l.getColored("["+levelName+"] ", level.getColor()) +
@@ -159,7 +162,7 @@ func (l *Logger) log(level Level, message string, parameters ...any) {
 }
 
 // getColored returns a message padded by with a color code if coloring is supported and specified
-func (l *Logger) getColored(message string, color func(str string, parameters ...any) string) string {
+func (l *Logger) getColored(message string, color func(str string) string) string {
 	if l.colorConf.enableColors {
 		return color(message)
 	}

@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"fmt"
 	"os"
 )
 
@@ -16,20 +15,20 @@ type colorConfig struct {
 // matching color. You can also specify replace values after the string
 // using printf.
 var (
-	colPurple      = color("\033[1;35m%s\033[0m")
-	colPurpleLight = color("\033[0;35m%s\033[0m")
-	colRed         = color("\033[1;31m%s\033[0m")
-	colYellow      = color("\033[1;33m%s\033[0m")
-	colBlue        = color("\033[1;34m%s\033[0m")
-	colBlueLight   = color("\033[0;34m%s\033[0m")
-	colCyan        = color("\033[1;36m%s\033[0m")
-	colGreen       = color("\033[0;32m%s\033[0m")
+	colPurple      = color("\033[1;35m", "\033[0m")
+	colPurpleLight = color("\033[0;35m", "\033[0m")
+	colRed         = color("\033[1;31m", "\033[0m")
+	colYellow      = color("\033[1;33m", "\033[0m")
+	colBlue        = color("\033[1;34m", "\033[0m")
+	colBlueLight   = color("\033[0;34m", "\033[0m")
+	colCyan        = color("\033[1;36m", "\033[0m")
+	colGreen       = color("\033[0;32m", "\033[0m")
 )
 
 // Color returns a function that pads the string with the given color code
-func color(colorString string) func(str string, parameters ...any) string {
-	return func(str string, parameters ...any) string {
-		return fmt.Sprintf(colorString, fmt.Sprintf(str, parameters...))
+func color(code, termination string) func(str string) string {
+	return func(str string) string {
+		return code + str + termination
 	}
 }
 
@@ -54,7 +53,7 @@ func newColorConfig(enable bool) (conf *colorConfig) {
 }
 
 // getColor returns the matching color for the level
-func (l Level) getColor() func(str string, parameters ...any) string {
+func (l Level) getColor() func(str string) string {
 	switch l {
 	case LevelTrace:
 		return colPurpleLight

@@ -2,4 +2,4 @@
 
 Go module providing simple logging support.
 
-Take a look at [main.go](main/main.go) for an example.
+Take a look at [main.go](cmd/main.go) for an example.
